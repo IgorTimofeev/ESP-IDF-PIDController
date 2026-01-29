@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <cstdint>
 
 namespace YOBA {
@@ -13,10 +14,10 @@ namespace YOBA {
 				const float i,
 				const float d,
 
-				const float outputMin,
-				const float outputMax,
-
 				const float deltaTime,
+
+				const float outputMin = -std::numeric_limits<float>::infinity(),
+				const float outputMax = std::numeric_limits<float>::infinity(),
 
 				const float derivativeLPFTau = 0.1f
 			) {
