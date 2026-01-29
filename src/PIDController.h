@@ -7,7 +7,7 @@ namespace YOBA {
 		public:
 			float tick(
 				const float measuredValue,
-				const float setpoint,
+				const float targetValue,
 
 				const float p,
 				const float i,
@@ -16,21 +16,42 @@ namespace YOBA {
 				const float outputMin,
 				const float outputMax,
 
-				const float deltaTime
+				const float deltaTime,
+
+				const float derivativeLPFTau = 0.1f
 			) {
-				const auto error = setpoint - measuredValue;
+				const auto error = targetValue - measuredValue;
+
+				// ----------------------------- Integral -----------------------------
 
 				_integral += error * deltaTime;
 
-				// Output
-				auto output =
-					// Proportional
-					p * error
-					// Integral
-					+ i * _integral
-					// Derivative
-					+ d * ((measuredValue - _measuredValuePrev) / deltaTime);
+				// Applying anti-windup
+				if (_integral > outputMax) {
+					_integral = outputMax;
+				}
+				else if (_integral < outputMin) {
+					_integral = outputMin;
+				}
 
+				// ----------------------------- Derivative -----------------------------
+
+				auto derivative = (measuredValue - _derivativePreviousMeasuredValue) / deltaTime;
+				_derivativePreviousMeasuredValue = measuredValue;
+
+				// Applying low-pass filter
+				const auto derivativeLPFAlpha = deltaTime / (derivativeLPFTau + deltaTime);
+				derivative = derivativeLPFAlpha * derivative + (1.f - derivativeLPFAlpha) * _derivativePreviousValue;
+				_derivativePreviousValue = derivative;
+
+				// ----------------------------- Output -----------------------------
+
+				auto output =
+					p * error
+					+ i * _integral
+					+ d * derivative;
+
+				// Clamping output
 				if (output > outputMax) {
 					output = outputMax;
 				}
@@ -38,13 +59,13 @@ namespace YOBA {
 					output = outputMin;
 				}
 
-				_measuredValuePrev = measuredValue;
-
 				return output;
 			}
 
 		private:
 			float _integral = 0;
-			float _measuredValuePrev = 0;
+
+			float _derivativePreviousMeasuredValue = 0;
+			float _derivativePreviousValue = 0;
 		};
 }
