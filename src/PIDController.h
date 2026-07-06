@@ -19,7 +19,7 @@ namespace YOBA {
 				const float outputMin = -std::numeric_limits<float>::infinity(),
 				const float outputMax = std::numeric_limits<float>::infinity(),
 
-				const float derivativeLPFTau = 0.1f
+				const float derivativeEMATau = 0.1f
 			) {
 				const auto error = targetValue - measuredValue;
 
@@ -40,9 +40,9 @@ namespace YOBA {
 				auto derivative = (measuredValue - _derivativePreviousMeasuredValue) / deltaTime;
 				_derivativePreviousMeasuredValue = measuredValue;
 
-				// Applying low-pass filter
-				const auto derivativeLPFAlpha = deltaTime / (derivativeLPFTau + deltaTime);
-				derivative = derivativeLPFAlpha * derivative + (1.f - derivativeLPFAlpha) * _derivativePreviousValue;
+				// Applying EMA filter
+				const auto derivativeEMAAlpha = deltaTime / (derivativeEMATau + deltaTime);
+				derivative = derivativeEMAAlpha * derivative + (1.f - derivativeEMAAlpha) * _derivativePreviousValue;
 				_derivativePreviousValue = derivative;
 
 				// ----------------------------- Output -----------------------------
