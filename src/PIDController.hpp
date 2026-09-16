@@ -63,6 +63,12 @@ namespace YOBA {
 				return output;
 			}
 
+			void reset() {
+				_integral = 0;
+				_derivativePreviousMeasuredValue = 0;
+				_derivativePreviousValue = 0;
+			}
+
 		private:
 			float _integral = 0;
 
