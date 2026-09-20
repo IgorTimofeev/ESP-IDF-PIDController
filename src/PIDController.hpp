@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <cstdint>
+#include <algorithm>
 
 namespace YOBA {
 	class PIDController {
@@ -19,7 +20,7 @@ namespace YOBA {
 				const float outputMin = -std::numeric_limits<float>::infinity(),
 				const float outputMax = std::numeric_limits<float>::infinity(),
 
-				const float derivativeEMAFilterTau = 0.1f
+				const float derivativeEMAFilterAlpha = 0.1f
 			) {
 				const auto error = targetValue - measuredValue;
 
@@ -29,68 +30,55 @@ namespace YOBA {
 
 				// On first tick() call derivative part can't be computed, because we need at least
 				// one measured value to work with
-				if (_inResetState) {
-					_inResetState = false;
+				if (_isReset) {
+					_isReset = false;
 
 					derivative = 0;
 				}
 				else {
-					derivative = (_derivativePrevMeasuredValue - measuredValue) / deltaTime;
+					derivative = (measuredValue - _prevMeasuredValue) / deltaTime;
 
 					// Applying EMA filter
-					const auto derivativeEMAAlpha = deltaTime / (derivativeEMAFilterTau + deltaTime);
-					derivative = derivativeEMAAlpha * derivative + (1.f - derivativeEMAAlpha) * _derivativePrevValue;
+					derivative = derivativeEMAFilterAlpha * derivative + (1.f - derivativeEMAFilterAlpha) * _prevDerivative;
 				}
 
-				_derivativePrevMeasuredValue = measuredValue;
-				_derivativePrevValue = derivative;
+				_prevDerivative = derivative;
+				_prevMeasuredValue = measuredValue;
 
 				// ----------------------------- Integral -----------------------------
+				
+				const float newIntegral = _prevIntegral + error * deltaTime;
+				const float newOutput = p * error + i * newIntegral + d * derivative;
 
-				const float integral = _integralPrevValue + error * deltaTime;
-
-				// Anti-windup protection
-				float output = p * error + d * derivative;
-				const float outputWithIntegral = output + i * integral;
-
-				// Output is undersaturated or oversaturated, using old integral value
-				if ((outputWithIntegral < outputMin && error < 0.f) || (outputWithIntegral > outputMax && error > 0.f)) {
-					output += i * _integralPrevValue;
-				}
-				// Output is in normal range, using new integral value
-				else {
-					_integralPrevValue = integral;
-					output = outputWithIntegral;
+				// Anti-windup, allowing integral to update only if...
+				if (
+					// Output is NOT saturated
+					!(newOutput > outputMax || newOutput < outputMin)
+					// or error sign allows to leave the saturation state
+					|| (newOutput > outputMax && error < 0.0f)
+					|| (newOutput < outputMin && error > 0.0f)
+				) {
+					_prevIntegral = newIntegral;
 				}
 
-				// ----------------------------- Output -----------------------------
-
-				// Clamping output
-				if (output > outputMax) {
-					output = outputMax;
-				}
-				else if (output < outputMin) {
-					output = outputMin;
-				}
-
-				return output;
+				return std::clamp(p * error + i * _prevIntegral + d * derivative, outputMin, outputMax);
 			}
 
 			void reset() {
-				_inResetState = true;
+				_isReset = true;
 
-				_integralPrevValue = 0;
+				_prevIntegral = 0;
 
-				_derivativePrevMeasuredValue = 0;
-				_derivativePrevValue = 0;
+				_prevMeasuredValue = 0;
+				_prevDerivative = 0;
 			}
 
 		private:
-			bool _inResetState = true;
+			bool _isReset = true;
 
-			float _integralPrevValue = 0;
+			float _prevIntegral = 0;
 
-			float _derivativePrevMeasuredValue = 0;
-			float _derivativePrevValue = 0;
+			float _prevMeasuredValue = 0;
+			float _prevDerivative = 0;
 		};
 }
